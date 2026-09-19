@@ -15,22 +15,50 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Create Android Project Structure
-        run: |
-          mkdir -p app/src/main/java/com/haraan/blur
-          mkdir -p app/src/main/res
-          
-          # نقل الكود اللي كتبناه لملف MainActivity.kt داخل الهيكل الصحيح
-          mv MainActivity.kt app/src/main/java/com/haraan/blur/ || echo "Already moved"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-          # إنشاء ملف AndroidManifest الأساسي للصلاحيات وخدمة الخلفية
+      - name: Build with Gradle
+        run: |
+          # إنشاء مشروع أندرويد حقيقي متكامل بالبنية البرمجية الصحيحة
+          mkdir -p app/src/main/java/com/haraan/blur
+          mkdir -p app/src/main/res/values
+
+          # نقل كود المالك والخدمة
+          cat << 'EOF' > app/src/main/java/com/haraan/blur/MainActivity.kt
+          package com.haraan.blur
+          import android.app.Service
+          import android.content.Intent
+          import android.os.IBinder
+          import android.os.Bundle
+          import android.widget.Toast
+          import androidx.appcompat.app.AppCompatActivity
+
+          class MainActivity : AppCompatActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  Toast.makeText(this, "مرحباً بك يا يوسف - وضع المالك نشط", Toast.LENGTH_LONG).show()
+                  startService(Intent(this, HaraanSmartBlurService::class.java))
+              }
+          }
+
+          class HaraanSmartBlurService : Service() {
+              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+                  return START_STICKY
+              }
+              override fun onBind(intent: Intent?): IBinder? = null
+          }
+          EOF
+
+          # ملف الماني فست الصلاحيات
           cat << 'EOF' > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.haraan.blur">
               <application
                   android:allowBackup="true"
                   android:label="Haraan Smart Blur"
-                  android:supportsRtl="true">
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.AppCompat.Light.NoActionBar">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
@@ -44,7 +72,11 @@ jobs:
           </manifest>
           EOF
 
-          # إنشاء ملف بناء بسيط Gradle لبناء الـ APK
+          cat << 'EOF' > settings.gradle
+          include ':app'
+          rootProject.name = "HaraanBlur"
+          EOF
+
           cat << 'EOF' > build.gradle
           allprojects {
               repositories {
@@ -54,15 +86,10 @@ jobs:
           }
           EOF
 
-          cat << 'EOF' > settings.gradle
-          include ':app'
-          rootProject.name = "HaraanBlur"
-          EOF
-
           cat << 'EOF' > app/build.gradle
           plugins {
               id 'com.android.application'
-              id 'org.jetbrains.kotlin.android'
+              id 'kotlin-android'
           }
           android {
               namespace 'com.haraan.blur'
@@ -81,15 +108,11 @@ jobs:
           }
           EOF
 
-      - name: Build APK with Gradle
-        run: |
-          # محاكاة خطوة تجميع APK وإصداره للاختبار المباشر
-          mkdir -p output_apk
-          echo "Vanta Engine Compiled Successfully for Youssef" > output_apk/app-release.apk
+          ./gradlew assembleDebug
 
-      - name: Upload APK Artifact
+      - name: Upload Real APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Haraan-Smart-Blur-APK
-          path: output_apk/app-release.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           
